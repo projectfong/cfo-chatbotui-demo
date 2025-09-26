@@ -1,0 +1,24 @@
+# --------------------------------------------------------
+# docker-compose.example.yml
+# --------------------------------------------------------
+# Demo-only configuration for CFO ChatbotUI
+# --------------------------------------------------------
+# WARNING:
+# - For local testing only.
+# - Do NOT expose these ports directly to the internet.
+# - Backend here is the demo gateway (echo-only).
+# --------------------------------------------------------
+
+services:
+  cfo_chatbotui:
+    build: .
+    container_name: cfo-chatbotui-demo
+    ports:
+      - "5173:5173"   # UI (local access only)
+      - "9000:9000"   # Demo API (local access only)
+    environment:
+      - CFO_GATEWAY_BIND=0.0.0.0
+      - CFO_GATEWAY_PORT=9000
+    command: >
+      bash -lc "python3 gateway.py & npm run dev --prefix ui -- --host 0.0.0.0 --port 5173 --strictPort"
+

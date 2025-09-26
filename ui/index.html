@@ -1,0 +1,390 @@
+<!-- 
+# -----------------------------------------------
+# ui/index.html
+# -----------------------------------------------
+-->
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cfo-chatbotui</title>
+    <style>
+      :root{
+        /* Dark defaults */
+        --bg:#0b0e11; --fg:#e5e7eb; --muted:#9ca3af; --card:#111418; --accent:#3b82f6;
+        /* Semantic tokens for theming */
+        --surface:#0d1117;         /* inputs, inner panels */
+        --border:#2b313b;
+        --bubble-user:#1f2937;
+        --bubble-bot:#0a1a33;
+        --code-bg:#0d1117;
+      }
+      @media (prefers-color-scheme: light){
+        :root{
+          --bg:#f8fafc; --fg:#0f172a; --muted:#475569; --card:#ffffff; --accent:#2563eb;
+          --surface:#f1f5f9;
+          --border:#d1d5db;
+          --bubble-user:#e7edf7;
+          --bubble-bot:#eef6ff;
+          --code-bg:#f3f4f6;
+        }
+      }
+      /* --- Theme overrides (user toggle) --- */
+      :root[data-theme="light"]{
+        --bg:#f8fafc; --fg:#0f172a; --muted:#475569; --card:#ffffff; --accent:#2563eb;
+        --surface:#f1f5f9; --border:#d1d5db; --bubble-user:#e7edf7; --bubble-bot:#eef6ff; --code-bg:#f3f4f6;
+      }
+      :root[data-theme="dark"]{
+        --bg:#0b0e11; --fg:#e5e7eb; --muted:#9ca3af; --card:#111418; --accent:#3b82f6;
+        --surface:#0d1117; --border:#2b313b; --bubble-user:#1f2937; --bubble-bot:#0a1a33; --code-bg:#0d1117;
+      }
+
+      *{ box-sizing:border-box; }
+      html,body{ height:100%; margin:0; }
+      body{ height:100vh; background:var(--bg); color:var(--fg); font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+
+      /* App grid: sidebar + main; full viewport height */
+      .app{ display:grid; grid-template-columns:300px 1fr; height:100vh; }
+
+      /* Sidebar: header (fixed), folders (scroll), KB (fixed) */
+      .sidebar{ border-right:1px solid #262a33; background:var(--card);
+                display:grid; grid-template-rows:auto 1fr auto; overflow:hidden; }
+      .side-top{ padding:12px; border-bottom:1px solid #262a33; display:flex; flex-direction:column; gap:6px; }
+      .side-top button{ padding:8px 10px; border-radius:10px; background:var(--accent); border:none; color:white; cursor:pointer; width:100%; }
+      .side-top .row{ display:flex; gap:8px; }
+      .side-top .row > button{ flex:1; }
+      .side-top .toggle{
+        padding:8px 10px; border-radius:10px; background:var(--surface); color:var(--fg);
+        border:1px solid var(--border); cursor:pointer; width:100%;
+      }
+      .session{ font-size:12px; color:var(--muted); }
+      .folders-list{ overflow:auto; padding:8px 12px; }
+      .folder-item{ padding:10px; border-radius:10px; background:var(--surface); margin-bottom:8px; cursor:pointer; }
+      .folder-item:hover{ background:color-mix(in oklab, var(--surface), #fff 4%); }
+      .folder-name{ font-weight:600; font-size:13px; }
+      .folder-meta{ color:var(--muted); font-size:12px; margin-top:2px; }
+      .folder-preview{ color:var(--muted); font-size:12px; margin-top:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .kb{ border-top:1px solid #262a33; padding:12px; }
+      .kb h4{ margin:0 0 8px 0; }
+      .kb textarea, .kb input{ width:100%; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--fg); margin-top:6px; }
+      .kb button{ margin-top:8px; padding:8px 10px; border-radius:10px; background:var(--accent); border:none; color:white; cursor:pointer; width:100%; }
+
+      /* Main: toolbar (fixed), chat (scroll), footer/composer (fixed) */
+      .main{ display:grid; grid-template-rows:auto 1fr auto; height:100%; overflow:hidden; }
+      .toolbar{ display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid #262a33; background:var(--card); }
+      .toolbar-left{ display:flex; gap:8px; align-items:center; }
+      .toolbar-left button{ padding:8px 10px; border-radius:10px; background:var(--accent); border:none; color:white; cursor:pointer; }
+      .toolbar-right{ font-size:14px; font-weight:600; color:var(--muted); }
+
+      /* Chat area (scrolls), centered rail uses ~90% of available width */
+      .chat{ overflow:auto; padding:16px; }
+      .rail{ width: clamp(720px, calc(90vw - 360px), 1400px); max-width: calc(100vw - 360px); margin:0 auto; }
+      .chat-inner{ display:flex; flex-direction:column; gap:12px; }
+
+      .wrap{ display:flex; flex-direction:column; }
+      .label{ font-size:12px; color:var(--muted); margin:2px 6px; }
+      .label.user{ align-self:flex-start; }
+      .label.bot{ align-self:flex-end; text-align:right; }
+
+      .bubble{
+        max-width:90%;                 /* use 90% of rail; dynamic but not full-width */
+        width:fit-content;
+        padding:12px 14px;
+        border-radius:14px;
+        background:var(--bubble-bot);
+        box-shadow: 0 1px 0 rgba(0,0,0,0.2);
+        white-space:pre-wrap;
+      }
+      .bubble.user { background:var(--bubble-user); align-self:flex-start; }
+      .bubble.bot  { background:var(--bubble-bot);  align-self:flex-end; }
+
+      .typing{ font-style:italic; color:var(--muted); padding:6px 0; }
+
+      /* Footer/composer (fixed row, never scrolls) */
+      .footer{ border-top:1px solid #262a33; background:var(--card); }
+      .footer-inner{ padding:12px 16px; }
+      .composer{ display:grid; grid-template-columns:140px 1fr 100px; gap:8px; align-items:center; }
+      .composer input, .composer textarea{
+        padding:10px; border-radius:12px; border:1px solid var(--border); background:var(--surface); color:var(--fg);
+      }
+      .composer textarea{ min-height:52px; resize:vertical; }
+      .composer button{
+        padding:10px 16px; border-radius:12px; background:var(--accent); border:none; color:white; cursor:pointer;
+        min-width:100px;
+      }
+
+      /* Markdown in bubbles */
+      .bubble :is(p,ul,ol){ margin:0.25rem 0; }
+      .bubble h1,.bubble h2,.bubble h3{ margin:0.4rem 0; }
+      .bubble code{ padding:0 0.25rem; background:var(--code-bg); border-radius:6px; }
+      .bubble pre{ background:var(--code-bg); padding:10px; border-radius:10px; overflow:auto; }
+
+      /* meta data underneath bubbles */
+      .meta {
+        font-size:12px;
+        color:var(--muted);
+        margin:6px 6px 0;
+        display:flex;
+        gap:12px;
+        flex-wrap:wrap;
+      }
+      .meta .dot { opacity:0.6; }
+
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="side-top">
+          <div class="row">
+            <button id="newChat">+ New Chat</button>
+            <button id="themeToggle" class="toggle" title="Toggle light/dark">Dark</button>
+          </div>
+          <div class="session" id="session"></div>
+        </div>
+        <div class="folders-list" id="folders"></div>
+        <div class="kb">
+          <h4>Knowledge Base</h4>
+          <textarea id="kbText" rows="4" placeholder="Paste text..."></textarea>
+          <input id="kbTags" placeholder="tag1,tag2" />
+          <button id="kbUpload">Upload</button>
+          <button id="exportAll">Export All (server)</button>
+        </div>
+      </aside>
+
+      <!-- Main -->
+      <main class="main">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <button data-qp="Summarize the last message.">Summary</button>
+            <button data-qp="List key risks and mitigations.">Risk</button>
+            <button data-qp="Extract action items with owners and due dates.">Actions</button>
+            <span id="status" class="typing"></span>
+          </div>
+          <div class="toolbar-right">CyberFusionOps | Purpose/Precision</div>
+        </div>
+
+        <div id="chat" class="chat">
+          <div id="chatInner" class="chat-inner rail"></div>
+        </div>
+
+        <div class="footer">
+          <div class="footer-inner rail">
+            <div class="composer">
+              <input id="folderName" placeholder="folder (default)" />
+              <textarea id="input" placeholder="Type a message..."></textarea>
+              <button id="send">Send</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script type="module">
+      import { marked } from 'marked';
+
+      const GW = location.origin.replace(':5173', ':9000');
+      const $ = (id)=>document.getElementById(id);
+
+      const chat       = $('chat');
+      const chatInner  = $('chatInner');
+      const statusEl   = $('status');
+
+      // --- Theme helpers (persisted override; defaults to system) ---
+      function currentPrefersDark(){
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      }
+      function applyTheme(mode){ // 'light' | 'dark' | null (system)
+        if (mode === 'light' || mode === 'dark') {
+          document.documentElement.setAttribute('data-theme', mode);
+          localStorage.setItem('cfo_theme', mode);
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+          localStorage.removeItem('cfo_theme');
+        }
+        const btn = $('themeToggle');
+        if (btn){
+          const effective = document.documentElement.getAttribute('data-theme') ||
+                            (currentPrefersDark() ? 'dark' : 'light');
+          btn.textContent = (effective === 'dark') ? 'Dark' : 'Light';
+        }
+      }
+      function initTheme(){
+        const saved = localStorage.getItem('cfo_theme');
+        if (saved === 'light' || saved === 'dark') applyTheme(saved);
+        else applyTheme(null);
+      }
+
+      let sessionId = localStorage.getItem('cfo_session');
+      let history   = JSON.parse(localStorage.getItem('cfo_history')||'{}');
+      let currentFolder = 'default';
+
+      async function ensureSession(){
+        if (sessionId && history[sessionId]) return sessionId;
+        const r = await fetch(`${GW}/api/session/new`, {method:'POST'});
+        const j = await r.json();
+        sessionId = j.session_id;
+        localStorage.setItem('cfo_session', sessionId);
+        $('session').textContent = sessionId;
+        history[sessionId] = { folders:{} };
+        persist();
+        return sessionId;
+      }
+
+      function persist(){
+        localStorage.setItem('cfo_history', JSON.stringify(history));
+        renderFolders();
+      }
+
+      function setFolder(name){
+        currentFolder = name || 'default';
+        $('folderName').value = currentFolder;
+        renderChat();
+      }
+
+      function renderFolders(){
+        const list = $('folders'); list.innerHTML='';
+        const folders = history[sessionId]?.folders || {};
+        const names = Object.keys(folders).length ? Object.keys(folders) : ['default'];
+        names.forEach(name=>{
+          const msgs = folders[name] || [];
+          const last = msgs.length ? msgs[msgs.length-1].content : '';
+          const item = document.createElement('div'); item.className='folder-item';
+          const title = document.createElement('div'); title.className='folder-name'; title.textContent = name;
+          const meta  = document.createElement('div'); meta.className='folder-meta'; meta.textContent = `${msgs.length} msgs`;
+          const preview = document.createElement('div'); preview.className='folder-preview'; preview.textContent = (last||'').replace(/\s+/g,' ').slice(0,80);
+          item.appendChild(title); item.appendChild(meta); item.appendChild(preview);
+          item.onclick = ()=> setFolder(name);
+          list.appendChild(item);
+        });
+      }
+
+      // small helper for rendering meta values
+      function valOrQ(x){ return (x === 0 || (x !== null && x !== undefined)) ? x : '?'; }
+
+      function renderChat(){
+        chatInner.innerHTML = '';
+        const msgs = (history[sessionId]?.folders?.[currentFolder]) || [];
+        msgs.forEach(m=>{
+          const wrap   = document.createElement('div'); wrap.className='wrap';
+
+          // label
+          const lbl    = document.createElement('div'); lbl.className='label ' + (m.role==='user'?'user':'bot');
+          lbl.textContent = m.role==='user' ? 'You:' : 'cfo-assistant:';
+
+          // bubble
+          const bubble = document.createElement('div'); bubble.className='bubble ' + (m.role==='user'?'user':'bot');
+          bubble.innerHTML = marked.parse(m.content);
+
+          wrap.appendChild(lbl);
+          wrap.appendChild(bubble);
+
+          // meta (assistant only)
+          if (m.role === 'assistant' && m.meta) {
+            const meta = m.meta || {};
+            const bar = document.createElement('div'); bar.className = 'meta';
+            const parts = [];
+
+            if (meta.trusted === true)  parts.push('trusted');
+            if (meta.trusted === false) parts.push('untrusted');
+            if (meta.model)    parts.push(`model: ${meta.model}`);
+            if (meta.provider) parts.push(`via: ${meta.provider}`);
+
+            if (meta.tokens_in != null || meta.tokens_out != null) {
+              parts.push(`tokens: in ${valOrQ(meta.tokens_in)} / out ${valOrQ(meta.tokens_out)}`);
+            }
+            if (meta.latency_ms != null) parts.push(`latency: ${valOrQ(meta.latency_ms)} ms`);
+            if (meta.hits != null)       parts.push(`hits: ${valOrQ(meta.hits)}`);
+
+            bar.textContent = parts.join('  ·  ');
+            wrap.appendChild(bar);
+          }
+
+          chatInner.appendChild(wrap);
+        });
+        chat.scrollTop = chat.scrollHeight;
+      }
+
+      function pushMessage(folder, role, content, meta){
+        const folders = (history[sessionId].folders ||= {});
+        (folders[folder] ||= []).push({ role, content, meta: meta || null, ts:new Date().toISOString() });
+        persist();
+      }
+
+      async function send(){
+        await ensureSession();
+        const folder = ($('folderName').value || currentFolder || 'default');
+        currentFolder = folder;
+        const input = $('input');
+        const text = input.value.trim(); if(!text) return;
+        input.value='';
+        pushMessage(folder,'user',text);
+        renderChat();
+
+        const typing = document.createElement('div');
+        typing.className='typing';
+        typing.textContent='cfo-assistant is typing...';
+        chatInner.appendChild(typing);
+        statusEl.textContent = 'Calling router...';
+
+        try{
+          const r = await fetch(`${GW}/api/query`, {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ session_id: sessionId, folder, messages:[{role:'user', content:text}], stream_simulation:true })
+          });
+          const j = await r.json();
+          typing.remove();
+          pushMessage(folder,'assistant',String(j.output||''), j.meta || null); // labeled & sanitized by gateway
+          renderChat();
+          statusEl.textContent='';
+        }catch(e){
+          typing.textContent='Error calling backend.'; statusEl.textContent='Error';
+        }
+      }
+
+      $('send').onclick = send;
+      $('input').addEventListener('keydown', e=>{
+        if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }
+      });
+      $('newChat').onclick = async ()=>{
+        localStorage.removeItem('cfo_session'); sessionId=null;
+        await ensureSession(); setFolder('default');
+      };
+      document.querySelectorAll('[data-qp]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          $('input').value = btn.getAttribute('data-qp'); $('input').focus();
+        });
+      });
+      $('kbUpload').onclick = async ()=>{
+        const text = $('kbText').value;
+        const tags = $('kbTags').value.split(',').map(s=>s.trim()).filter(Boolean);
+        const r = await fetch(`${GW}/api/kb/upload`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text, tags })});
+        const j = await r.json(); alert('KB upload: ' + JSON.stringify(j));
+      };
+      $('exportAll').onclick = async ()=>{
+        const r = await fetch(`${GW}/api/export`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(history)});
+        const j = await r.json(); alert('Server export: ' + (j.path || 'ok'));
+      };
+
+      // Theme toggle wiring and init
+      $('themeToggle').addEventListener('click', ()=>{
+        const attr = document.documentElement.getAttribute('data-theme');
+        const effective = attr || (currentPrefersDark() ? 'dark' : 'light');
+        applyTheme(effective === 'dark' ? 'light' : 'dark');
+      });
+      initTheme();
+      if (window.matchMedia){
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        mq.addEventListener?.('change', ()=> {
+          if (!localStorage.getItem('cfo_theme')) applyTheme(null);
+        });
+      }
+
+      await ensureSession(); $('session').textContent = sessionId;
+      setFolder('default'); renderFolders();
+    </script>
+  </body>
+</html>

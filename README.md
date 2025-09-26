@@ -51,9 +51,9 @@ Below are screenshots showing the application in action:
 * Docker container running (frontend + backend)
 * Backend logs processing API calls
 
-![Chat UI](docs/screenshots/ui-demo.png)
-![Docker Container](docs/screenshots/docker.png)
-![Logs](docs/screenshots/logs.png)
+![Chat UI](docs/ui-demo.png)
+![Docker Container](docs/docker.png)
+![Logs](docs/logs.png)
 
 ---
 

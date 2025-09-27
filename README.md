@@ -57,6 +57,16 @@ Below are screenshots showing the application in action:
 
 ---
 
+## 🔹 Private Gitea Screenshot
+
+Screenshot from local private Gitea repo (sensitive details redacted):
+
+* **cfo-chatbotui repo**
+
+![ChatbotUI](docs/chatbotui-local.png)
+  
+---
+
 ## 🔹 Disclaimer
 
 ⚠️ This repository is a **demo version**.
